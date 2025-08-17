@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roblox Trade Ad Helper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Roblox Trade Ad Helper</h1>
+            <p>Fetch your inventory and create a trade ad in seconds.</p>
+        </header>
+
+        <!-- Step 1: Fetch User Inventory -->
+        <div class="card" id="fetchCard">
+            <h2>Step 1: Fetch Inventory</h2>
+            <div class="input-group">
+                <input type="text" id="usernameInput" placeholder="Enter your Roblox Username">
+                <button id="fetchButton">Fetch Items</button>
+            </div>
+        </div>
+
+        <!-- Sections will be displayed as needed by the script -->
+        <div class="card" id="inventorySection" style="display: none;">
+            <h2>Step 2: Select Your Items [H]</h2>
+            <div id="inventoryList"></div>
+            <p id="statusMessage" class="status"></p>
+        </div>
+
+        <div class="card" id="wantsSection" style="display: none;">
+            <h2>Step 3: Select What You Want [W]</h2>
+            <div class="tags-container">
+                <button class="tag-button" data-tag="any">ANY</button>
+                <button class="tag-button" data-tag="demand">DEMAND</button>
+                <button class="tag-button" data-tag="rares">RARES</button>
+                <button class="tag-button" data-tag="upgrade">UPGRADE</button>
+                <button class="tag-button" data-tag="downgrade">DOWNGRADE</button>
+                <button class="tag-button" data-tag="wishlist">WISHLIST</button>
+            </div>
+            <div class="input-group">
+                 <input type="text" id="catalogSearchInput" placeholder="Search for a specific limited...">
+            </div>
+            <div id="catalogList"></div>
+             <p id="catalogStatus" class="status"></p>
+        </div>
+
+        <!-- Official Verification Section -->
+        <div class="card" id="verificationSection" style="display: none;">
+            <h2>Step 4: Verify Your Account</h2>
+            <p>To post ads, you must verify you own the account. Please follow these steps:</p>
+            <ol>
+                <li>Click the button below to generate a unique phrase.</li>
+                <li>Copy the phrase and paste it into your Roblox profile's "About Me" section.</li>
+                <li>Come back here and click "Verify".</li>
+            </ol>
+            <div class="verification-controls">
+                <button id="generatePhraseButton">Generate Phrase</button>
+                <input type="text" id="verificationPhraseInput" readonly placeholder="Your phrase will appear here...">
+                <button id="verifyPhraseButton" disabled>Verify</button>
+            </div>
+            <p id="verificationStatus" class="status"></p>
+        </div>
+
+        <div class="card" id="adSection" style="display: none;">
+            <h2>Step 5: Post Ad</h2>
+            <p>Verification successful! You can now start posting ads.</p>
+            <div class="ad-controls">
+                <button id="startButton">Start</button>
+                <button id="stopButton" disabled>Stop</button>
+            </div>
+            <p id="adStatus" class="status"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Element References ---
+            const fetchCard = document.getElementById('fetchCard');
+            const usernameInput = document.getElementById('usernameInput');
+            const fetchButton = document.getElementById('fetchButton');
+            const inventorySection = document.getElementById('inventorySection');
+            const inventoryList = document.getElementById('inventoryList');
+            const statusMessage = document.getElementById('statusMessage');
+            const wantsSection = document.getElementById('wantsSection');
+            const adSection = document.getElementById('adSection');
+            const startButton = document.getElementById('startButton');
+            const stopButton = document.getElementById('stopButton');
+            const adStatus = document.getElementById('adStatus');
+            const catalogSearchInput = document.getElementById('catalogSearchInput');
+            const catalogList = document.getElementById('catalogList');
+            const catalogStatus = document.getElementById('catalogStatus');
+            const tagButtons = document.querySelectorAll('.tag-button');
+            const mainTitle = document.querySelector('header h1');
+            const verificationSection = document.getElementById('verificationSection');
+            const generatePhraseButton = document.getElementById('generatePhraseButton');
+            const verificationPhraseInput = document.getElementById('verificationPhraseInput');
+            const verifyPhraseButton = document.getElementById('verifyPhraseButton');
+            const verificationStatus = document.getElementById('verificationStatus');
+
+            // --- State ---
+            let allLimitedsData = [];
+            let currentlyDisplayedLimiteds = [];
+            let renderedItemCount = 0;
+            const ITEMS_PER_LOAD = 50;
+            let currentUserId = null;
+            let adPostTimeout = null;
+            let countdownInterval = null;
+            let postCount = 0;
+            const MAX_POSTS = 60;
+            const COOLDOWN_MINUTES = 16;
+
+            // --- Event Listener for Fetch Button ---
+            fetchButton.addEventListener('click', async () => {
+                const username = usernameInput.value.trim();
+                if (!username) {
+                    alert('Please enter a username.');
+                    return;
+                }
+                
+                statusMessage.textContent = 'Fetching your inventory...';
+                statusMessage.className = 'status loading';
+                inventorySection.style.display = 'block';
+                fetchButton.disabled = true;
+                fetchButton.textContent = 'Loading...';
+
+                try {
+                    const response = await fetch(`/api/get-inventory/${username}`);
+                    const result = await response.json();
+
+                    if (result.success) {
+                        mainTitle.textContent = `${result.username}'s Trade Helper`;
+                        fetchCard.style.display = 'none'; // Hide input after fetch
+                        currentUserId = result.user_id;
+                        statusMessage.textContent = result.message;
+                        statusMessage.className = 'status success';
+                        displayInventory(result.data);
+                        if (result.data.length > 0) {
+                           wantsSection.style.display = 'block';
+                           verificationSection.style.display = 'block';
+                           fetchAllLimiteds();
+                        }
+                    } else {
+                        statusMessage.textContent = `Error: ${result.error}`;
+                        statusMessage.className = 'status error';
+                    }
+                } catch (error) {
+                    statusMessage.textContent = 'A network error occurred. Is the server running?';
+                    statusMessage.className = 'status error';
+                } finally {
+                    fetchButton.disabled = false;
+                    fetchButton.textContent = 'Fetch Items';
+                }
+            });
+
+            // --- Fetch All Limiteds from API ---
+            async function fetchAllLimiteds() {
+                catalogStatus.textContent = 'Loading all limiteds...';
+                catalogStatus.className = 'status loading';
+                try {
+                    const response = await fetch('/get-all-limiteds');
+                    const result = await response.json();
+                    if(result.success) {
+                        allLimitedsData = result.data;
+                        currentlyDisplayedLimiteds = allLimitedsData;
+                        renderMoreItems(true);
+                        catalogStatus.textContent = result.message;
+                        catalogStatus.className = 'status success';
+                    } else {
+                        catalogStatus.textContent = `Error: ${result.error}`;
+                        statusMessage.className = 'status error';
+                    }
+                } catch (error) {
+                    catalogStatus.textContent = 'Failed to fetch catalog items.';
+                    catalogStatus.className = 'status error';
+                }
+            }
+
+            // --- Display and Filter Logic ---
+            function displayInventory(items) {
+                inventoryList.innerHTML = '';
+                if (items.length === 0) {
+                    inventoryList.innerHTML = '<p>No limited items found.</p>';
+                    return;
+                }
+                items.forEach(item => {
+                    let valueString = '';
+                    if (item.rap && item.rap > 0) {
+                        valueString = `<span class="item-rap">RAP: ${item.rap.toLocaleString()}</span>`;
+                    } else if (item.value && item.value > 0) {
+                        valueString = `<span class="item-rap">Value: ${item.value.toLocaleString()}</span>`;
+                    }
+                    inventoryList.innerHTML += `
+                        <div class="item">
+                            <input type="checkbox" id="have-${item.userAssetId}" name="haveItem" value="${item.assetId}">
+                            <label for="have-${item.userAssetId}">
+                                <span class="item-name">${item.name}</span>
+                                ${valueString}
+                            </label>
+                        </div>`;
+                });
+            }
+
+            function renderMoreItems(isInitial = false) {
+                if (isInitial) {
+                    catalogList.innerHTML = '';
+                    renderedItemCount = 0;
+                }
+                const fragment = document.createDocumentFragment();
+                const itemsToRender = currentlyDisplayedLimiteds.slice(renderedItemCount, renderedItemCount + ITEMS_PER_LOAD);
+                itemsToRender.forEach(item => {
+                    let valueString = '';
+                    if (item.rap && item.rap > 0) {
+                        valueString = `<span class="item-rap">RAP: ${item.rap.toLocaleString()}</span>`;
+                    } else if (item.value && item.value > 0) {
+                        valueString = `<span class="item-rap">Value: ${item.value.toLocaleString()}</span>`;
+                    }
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'item';
+                    itemElement.innerHTML = `
+                        <input type="checkbox" id="want-${item.id}" name="wantItem" value="${item.id}">
+                        <label for="want-${item.id}">
+                            <span class="item-name">${item.name}</span>
+                            ${valueString}
+                        </label>`;
+                    fragment.appendChild(itemElement);
+                });
+                catalogList.appendChild(fragment);
+                renderedItemCount += itemsToRender.length;
+            }
+
+            catalogList.addEventListener('scroll', () => {
+                if (catalogList.scrollTop + catalogList.clientHeight >= catalogList.scrollHeight - 200) {
+                    if (renderedItemCount < currentlyDisplayedLimiteds.length) renderMoreItems();
+                }
+            });
+
+            catalogSearchInput.addEventListener('input', () => {
+                const searchTerm = catalogSearchInput.value.toLowerCase();
+                currentlyDisplayedLimiteds = allLimitedsData.filter(item => 
+                    item.name.toLowerCase().includes(searchTerm)
+                );
+                renderMoreItems(true);
+            });
+
+            // --- Official Verification Logic ---
+            generatePhraseButton.addEventListener('click', async () => {
+                verificationStatus.textContent = 'Generating phrase...';
+                verificationStatus.className = 'status loading';
+                try {
+                    const response = await fetch(`/api/get-phrase/${currentUserId}`);
+                    const result = await response.json();
+                    if (result.success) {
+                        verificationPhraseInput.value = result.phrase;
+                        verificationStatus.textContent = 'Phrase generated! Please copy it to your profile.';
+                        verificationStatus.className = 'status success';
+                        verifyPhraseButton.disabled = false;
+                    } else {
+                        verificationStatus.textContent = `Error: ${result.error || 'Failed to get phrase.'}`;
+                        verificationStatus.className = 'status error';
+                    }
+                } catch (error) {
+                    verificationStatus.textContent = 'A network error occurred.';
+                    verificationStatus.className = 'status error';
+                }
+            });
+
+            verifyPhraseButton.addEventListener('click', async () => {
+                verificationStatus.textContent = 'Verifying...';
+                verificationStatus.className = 'status loading';
+                try {
+                    const response = await fetch(`/api/verify-phrase/${currentUserId}`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        verificationStatus.textContent = "Verification successful!";
+                        verificationStatus.className = 'status success';
+                        verificationSection.style.display = 'none'; // Hide verification
+                        adSection.style.display = 'block'; // Show ad posting
+                    } else {
+                        verificationStatus.textContent = `Error: ${result.error || 'Verification failed.'}`;
+                        verificationStatus.className = 'status error';
+                    }
+                } catch (error) {
+                    verificationStatus.textContent = 'A network error occurred.';
+                    verificationStatus.className = 'status error';
+                }
+            });
+
+            // --- Ad Posting Logic ---
+            tagButtons.forEach(button => button.addEventListener('click', () => button.classList.toggle('active')));
+
+            function startCountdown(durationInMinutes) {
+                let durationInSeconds = durationInMinutes * 60;
+                function updateTimer() {
+                    const minutes = Math.floor(durationInSeconds / 60);
+                    let seconds = durationInSeconds % 60;
+                    seconds = seconds < 10 ? '0' + seconds : seconds;
+                    adStatus.textContent = `Next ad in ${minutes}:${seconds}`;
+                    if (--durationInSeconds < 0) clearInterval(countdownInterval);
+                }
+                clearInterval(countdownInterval);
+                updateTimer();
+                countdownInterval = setInterval(updateTimer, 1000);
+            }
+
+            async function postAdLoop() {
+                if (postCount >= MAX_POSTS) {
+                    adStatus.textContent = `Finished posting all ${MAX_POSTS} ads.`;
+                    adStatus.className = 'status success';
+                    stopButton.click();
+                    return;
+                }
+                postCount++;
+                adStatus.textContent = `Posting ad ${postCount} of ${MAX_POSTS}...`;
+                adStatus.className = 'status loading';
+
+                const offer_item_ids = Array.from(document.querySelectorAll('input[name="haveItem"]:checked')).map(cb => parseInt(cb.value));
+                const request_tags = Array.from(document.querySelectorAll('.tag-button.active')).map(btn => btn.dataset.tag);
+                const request_item_ids = Array.from(document.querySelectorAll('input[name="wantItem"]:checked')).map(cb => parseInt(cb.value));
+
+                let postSuccess = false;
+                try {
+                    const response = await fetch('/api/post-trade-ad', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ player_id: currentUserId, offer_item_ids, request_item_ids, request_tags })
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                            adStatus.textContent = `Ad ${postCount}/${MAX_POSTS} posted!`;
+                            adStatus.className = 'status success';
+                            postSuccess = true;
+                        }
+                    }
+                } catch (error) {}
+                
+                if (!postSuccess) {
+                    adStatus.textContent = `Ad ${postCount}/${MAX_POSTS} failed (cooldown?). Retrying after cooldown.`;
+                    adStatus.className = 'status error';
+                }
+                
+                setTimeout(() => startCountdown(COOLDOWN_MINUTES), 2000);
+                adPostTimeout = setTimeout(postAdLoop, COOLDOWN_MINUTES * 60 * 1000);
+            }
+
+            startButton.addEventListener('click', () => {
+                const offer_item_ids = Array.from(document.querySelectorAll('input[name="haveItem"]:checked'));
+                if (offer_item_ids.length === 0) {
+                    adStatus.textContent = 'Error: Please select at least one item you have.';
+                    adStatus.className = 'status error';
+                    return;
+                }
+                stopButton.click();
+                postCount = 0;
+                postAdLoop();
+                startButton.disabled = true;
+                stopButton.disabled = false;
+            });
+
+            stopButton.addEventListener('click', () => {
+                if (adPostTimeout) clearTimeout(adPostTimeout);
+                if (countdownInterval) clearInterval(countdownInterval);
+                adPostTimeout = null;
+                countdownInterval = null;
+                adStatus.textContent = 'Ad posting stopped.';
+                adStatus.className = 'status';
+                startButton.disabled = false;
+                stopButton.disabled = true;
+            });
+        });
+    </script>
+
+</body>
+</html>
