@@ -19,6 +19,8 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # --- Redis Cache Setup ---
 redis_url = os.getenv("REDIS_HOST", "redis://localhost:6379")
+# NEW: Add a print statement to debug the Redis connection URL in the logs
+print(f"--> Attempting to connect to Redis at: {redis_url}")
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
 # --- Constants ---
