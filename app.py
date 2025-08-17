@@ -18,7 +18,7 @@ load_dotenv()
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # --- Redis Cache Setup ---
-redis_url = os.getenv("REDIS_HOST", "redis://localhost:6379")
+redis_url = os.getenv("REDIS_HOST", "redis://red-d2gkuc0gjchc73b8sm2g:6379")
 print(f"--> Attempting to connect to Redis at: {redis_url}")
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
@@ -201,3 +201,4 @@ def post_trade_ad():
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
+
