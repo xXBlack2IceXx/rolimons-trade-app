@@ -253,6 +253,7 @@
                 verificationStatus.textContent = 'Generating phrase...';
                 verificationStatus.className = 'status loading';
                 try {
+                    // CORRECTED: Changed from POST to GET
                     const response = await fetch(`/api/get-phrase/${currentUserId}`);
                     const result = await response.json();
                     if (result.success) {
