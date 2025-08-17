@@ -3,7 +3,7 @@
 Flask Web Application for Roblox Trade Ad Helper
 This application uses Rolimon's official "secret phrase" verification method.
 """
-from flask import Flask, render_template, jsonify, request, make_response
+from flask import Flask, render_template, jsonify, request
 import requests
 import time
 import redis
@@ -18,10 +18,8 @@ load_dotenv()
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # --- Redis Cache Setup ---
-# CORRECTED: Use redis.from_url() to correctly parse the connection URL from Render
 redis_url = os.getenv("REDIS_HOST", "redis://localhost:6379")
 redis_client = redis.from_url(redis_url, decode_responses=True)
-
 
 # --- Constants ---
 USER_SEARCH_URL = "https://users.roblox.com/v1/usernames/users"
@@ -173,7 +171,7 @@ def post_trade_ad():
     data = request.json
     user_id = data.get("player_id")
 
-    # Get the user's cookie from Redis
+    # CORRECTED: Get the user's cookie from Redis, not the browser request
     try:
         user_cookie = redis_client.get(f"user_cookie:{user_id}")
         if not user_cookie:
