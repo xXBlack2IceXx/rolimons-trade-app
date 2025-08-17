@@ -18,7 +18,10 @@ load_dotenv()
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # --- Redis Cache Setup ---
-redis_client = redis.Redis(host=os.getenv("REDIS_HOST", "localhost"), port=6379, db=0, decode_responses=True)
+# CORRECTED: Use redis.from_url() to correctly parse the connection URL from Render
+redis_url = os.getenv("REDIS_HOST", "redis://localhost:6379")
+redis_client = redis.from_url(redis_url, decode_responses=True)
+
 
 # --- Constants ---
 USER_SEARCH_URL = "https://users.roblox.com/v1/usernames/users"
@@ -137,7 +140,6 @@ def get_phrase(user_id):
     """Gets a secret phrase from Rolimon's for verification."""
     try:
         url = ROLIMONS_GET_PHRASE_URL.format(player_id=user_id)
-        # CORRECTED: Changed from POST to GET
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         return jsonify(resp.json()), resp.status_code
@@ -198,4 +200,4 @@ def post_trade_ad():
 # --- Main Execution ---
 
 if __name__ == '__main__':
-    app.run(debug=false, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
