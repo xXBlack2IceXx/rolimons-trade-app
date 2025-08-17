@@ -3,7 +3,7 @@
 Flask Web Application for Roblox Trade Ad Helper
 This application uses Rolimon's official "secret phrase" verification method.
 """
-from flask import Flask, render_template, jsonify, request, make_response
+from flask import Flask, render_template, jsonify, request
 import requests
 import time
 import redis
@@ -19,7 +19,6 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # --- Redis Cache Setup ---
 redis_url = os.getenv("REDIS_HOST", "redis://localhost:6379")
-# NEW: Add a print statement to debug the Redis connection URL in the logs
 print(f"--> Attempting to connect to Redis at: {redis_url}")
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
@@ -140,7 +139,6 @@ def get_phrase(user_id):
     """Gets a secret phrase from Rolimon's for verification."""
     try:
         url = ROLIMONS_GET_PHRASE_URL.format(player_id=user_id)
-        # CORRECTED: Changed from POST to GET
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         return jsonify(resp.json()), resp.status_code
