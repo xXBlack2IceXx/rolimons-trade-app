@@ -160,7 +160,8 @@ def verify_phrase(user_id):
         # Securely store the new cookie in Redis, linked to the user's ID
         redis_client.setex(f"user_cookie:{user_id}", 86400, roli_verification_cookie) # Expires in 24 hours
         
-        return jsonify(resp.json()), resp.status_code
+        # CORRECTED: Return our own success message instead of parsing Rolimon's response
+        return jsonify({"success": True, "message": "Verification successful!"}), 200
         
     except requests.exceptions.RequestException as e:
         error_text = e.response.json().get("message", str(e)) if e.response else str(e)
